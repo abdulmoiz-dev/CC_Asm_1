@@ -2,59 +2,23 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include <regex>
 #include <cctype>
 #include <unordered_map>
 #include <algorithm>
 
 using namespace std;
 
+// Enum remains the same, but T_QUOTES is no longer needed
+// as strings are now a single token.
 enum TokenType
 {
-    T_FUNCTION,
-    T_INT,
-    T_FLOAT,
-    T_STRING,
-    T_BOOL,
-    T_RETURN,
-    T_IDENTIFIER,
-    T_INTLIT,
-    T_FLOATLIT,
-    T_STRINGLIT,
-    T_BOOLLIT,
-    T_PARENL,
-    T_PARENR,
-    T_BRACEL,
-    T_BRACER,
-    T_BRACKETL,
-    T_BRACKETR,
-    T_COMMA,
-    T_SEMICOLON,
-    T_COLON,
-    T_QUOTES,
-    T_ASSIGNOP,
-    T_EQUALSOP,
-    T_NOTEQUALS,
-    T_LESSTHAN,
-    T_GREATERTHAN,
-    T_LESSEQUAL,
-    T_GREATEREQUAL,
-    T_PLUS,
-    T_MINUS,
-    T_MULT,
-    T_DIV,
-    T_AND,
-    T_OR,
-    T_NOT,
-    T_IF,
-    T_ELSE,
-    T_WHILE,
-    T_FOR,
-    T_COMMENT,
-    T_UNKNOWN,
-    T_EOF,
-    T_OUTPUTOP,
-    T_INPUTOP
+    T_FUNCTION, T_INT, T_FLOAT, T_STRING, T_BOOL, T_RETURN, T_IDENTIFIER,
+    T_INTLIT, T_FLOATLIT, T_STRINGLIT, T_BOOLLIT, T_PARENL, T_PARENR,
+    T_BRACEL, T_BRACER, T_BRACKETL, T_BRACKETR, T_COMMA, T_SEMICOLON,
+    T_COLON, T_ASSIGNOP, T_EQUALSOP, T_NOTEQUALS, T_LESSTHAN,
+    T_GREATERTHAN, T_LESSEQUAL, T_GREATEREQUAL, T_PLUS, T_MINUS, T_MULT,
+    T_DIV, T_AND, T_OR, T_NOT, T_IF, T_ELSE, T_WHILE, T_FOR,
+    T_COMMENT, T_UNKNOWN, T_EOF, T_OUTPUTOP, T_INPUTOP
 };
 
 struct Token
@@ -67,309 +31,251 @@ struct Token
 class Lexer
 {
 private:
+    string source;
     vector<Token> tokens;
-    int lineNumber;
+    vector<string> errors;
+    size_t pos = 0;
+    int lineNumber = 1;
 
     unordered_map<string, TokenType> keywords = {
-        {"fn", T_FUNCTION}, {"int", T_INT}, {"float", T_FLOAT}, {"string", T_STRING}, {"bool", T_BOOL}, {"return", T_RETURN}, {"if", T_IF}, {"else", T_ELSE}, {"while", T_WHILE}, {"for", T_FOR}, {"true", T_BOOLLIT}, {"false", T_BOOLLIT}};
-
-    unordered_map<string, TokenType> operators = {
-        {"=", T_ASSIGNOP}, {"==", T_EQUALSOP}, {"!=", T_NOTEQUALS}, {"<", T_LESSTHAN}, {">", T_GREATERTHAN}, {"<=", T_LESSEQUAL}, {">=", T_GREATEREQUAL}, {"+", T_PLUS}, {"-", T_MINUS}, {"*", T_MULT}, {"/", T_DIV}, {"&&", T_AND}, {"||", T_OR}, {"!", T_NOT}, {"<<", T_OUTPUTOP}, {">>", T_INPUTOP}};
+        {"fn", T_FUNCTION}, {"int", T_INT}, {"float", T_FLOAT},
+        {"string", T_STRING}, {"bool", T_BOOL}, {"return", T_RETURN},
+        {"if", T_IF}, {"else", T_ELSE}, {"while", T_WHILE},
+        {"for", T_FOR}, {"true", T_BOOLLIT}, {"false", T_BOOLLIT}
+    };
 
 public:
-    Lexer() : lineNumber(1) {}
+    Lexer() = default;
 
-    vector<Token> tokenize(const string &source)
+    // Main tokenization function
+    vector<Token> tokenize(const string &source_code)
     {
-        string remaining = source;
-        tokens.clear();
+        source = source_code;
+        pos = 0;
         lineNumber = 1;
+        tokens.clear();
+        errors.clear();
 
-        while (!remaining.empty())
+        while (!is_at_end())
         {
-            // Skip whitespace
-            if (isspace(remaining[0]))
-            {
-                if (remaining[0] == '\n')
-                    lineNumber++;
-                remaining = remaining.substr(1);
-                continue;
-            }
-
-            // Check for comments
-            if (remaining.size() >= 2 && remaining.substr(0, 2) == "//")
-            {
-                size_t end = remaining.find('\n');
-                if (end == string::npos)
-                    break;
-                remaining = remaining.substr(end);
-                continue;
-            }
-
-            if (remaining.size() >= 2 && remaining.substr(0, 2) == "/*")
-            {
-                size_t end = remaining.find("*/");
-                if (end == string::npos)
-                {
-                    cerr << "Error: Unclosed comment at line " << lineNumber << endl;
-                    break;
-                }
-                string commentPart = remaining.substr(0, end + 2);
-                int newlines = count(commentPart.begin(), commentPart.end(), '\n');
-                lineNumber += newlines;
-                remaining = remaining.substr(end + 2);
-                continue;
-            }
-
-            bool matched = false;
-
-            // Try to match identifiers and keywords
-            regex identRegex("^[a-zA-Z_][a-zA-Z0-9_]*");
-            smatch match;
-            if (regex_search(remaining, match, identRegex))
-            {
-                string ident = match.str();
-                if (keywords.find(ident) != keywords.end())
-                {
-                    tokens.push_back({keywords[ident], ident, lineNumber});
-                }
-                else
-                {
-                    tokens.push_back({T_IDENTIFIER, ident, lineNumber});
-                }
-                remaining = remaining.substr(ident.length());
-                matched = true;
-            }
-            // Try to match numbers
-            else if (regex_search(remaining, match, regex("^\\d+\\.\\d+")))
-            {
-                tokens.push_back({T_FLOATLIT, match.str(), lineNumber});
-                remaining = remaining.substr(match.str().length());
-                matched = true;
-            }
-            else if (regex_search(remaining, match, regex("^\\d+")))
-            {
-                tokens.push_back({T_INTLIT, match.str(), lineNumber});
-                remaining = remaining.substr(match.str().length());
-                matched = true;
-            }
-            // Try to match string literals
-            else if (remaining[0] == '"')
-            {
-                // Add opening quote token
-                tokens.push_back({T_QUOTES, "\"", lineNumber});
-
-                size_t end = 1;
-                bool escaped = false;
-                while (end < remaining.length())
-                {
-                    if (remaining[end] == '\\')
-                    {
-                        escaped = !escaped;
-                    }
-                    else if (remaining[end] == '"' && !escaped)
-                    {
-                        break;
-                    }
-                    else
-                    {
-                        escaped = false;
-                    }
-                    end++;
-                }
-
-                if (end >= remaining.length())
-                {
-                    cerr << "Error: Unclosed string literal at line " << lineNumber << endl;
-                    break;
-                }
-
-                string strLit = remaining.substr(1, end - 1);
-                tokens.push_back({T_STRINGLIT, strLit, lineNumber});
-
-                // Add closing quote token
-                tokens.push_back({T_QUOTES, "\"", lineNumber});
-
-                remaining = remaining.substr(end + 1);
-                matched = true;
-            }
-            // Try to match operators and punctuation
-            else
-            {
-                // Check multi-character operators first
-                bool opMatched = false;
-                if (remaining.size() >= 2)
-                {
-                    string twoCharOp = remaining.substr(0, 2);
-                    if (operators.find(twoCharOp) != operators.end())
-                    {
-                        tokens.push_back({operators[twoCharOp], twoCharOp, lineNumber});
-                        remaining = remaining.substr(2);
-                        opMatched = true;
-                        matched = true;
-                    }
-                }
-
-                if (!opMatched)
-                {
-                    string singleCharOp = string(1, remaining[0]);
-                    if (operators.find(singleCharOp) != operators.end())
-                    {
-                        tokens.push_back({operators[singleCharOp], singleCharOp, lineNumber});
-                        remaining = remaining.substr(1);
-                        matched = true;
-                    }
-                }
-
-                if (!matched)
-                {
-                    switch (remaining[0])
-                    {
-                    case '(':
-                        tokens.push_back({T_PARENL, "(", lineNumber});
-                        break;
-                    case ')':
-                        tokens.push_back({T_PARENR, ")", lineNumber});
-                        break;
-                    case '{':
-                        tokens.push_back({T_BRACEL, "{", lineNumber});
-                        break;
-                    case '}':
-                        tokens.push_back({T_BRACER, "}", lineNumber});
-                        break;
-                    case '[':
-                        tokens.push_back({T_BRACKETL, "[", lineNumber});
-                        break;
-                    case ']':
-                        tokens.push_back({T_BRACKETR, "]", lineNumber});
-                        break;
-                    case ',':
-                        tokens.push_back({T_COMMA, ",", lineNumber});
-                        break;
-                    case ';':
-                        tokens.push_back({T_SEMICOLON, ";", lineNumber});
-                        break;
-                    case ':':
-                        tokens.push_back({T_COLON, ":", lineNumber});
-                        break;
-                    default:
-                        tokens.push_back({T_UNKNOWN, string(1, remaining[0]), lineNumber});
-                        cerr << "Warning: Unknown character '" << remaining[0]
-                             << "' at line " << lineNumber << endl;
-                    }
-                    remaining = remaining.substr(1);
-                    matched = true;
-                }
-            }
+            scan_token();
         }
 
         tokens.push_back({T_EOF, "", lineNumber});
         return tokens;
     }
+
+    const vector<string>& getErrors() const {
+        return errors;
+    }
+
+private:
+    bool is_at_end() {
+        return pos >= source.length();
+    }
+
+    char advance() {
+        return source[pos++];
+    }
+
+    char peek() {
+        if (is_at_end()) return '\0';
+        return source[pos];
+    }
+
+    char peek_next() {
+        if (pos + 1 >= source.length()) return '\0';
+        return source[pos + 1];
+    }
+
+    // Main scanner dispatch
+    void scan_token()
+    {
+        char c = advance();
+        switch (c)
+        {
+            // Single-character tokens
+            case '(': add_token(T_PARENL, "("); break;
+            case ')': add_token(T_PARENR, ")"); break;
+            case '{': add_token(T_BRACEL, "{"); break;
+            case '}': add_token(T_BRACER, "}"); break;
+            case '[': add_token(T_BRACKETL, "["); break;
+            case ']': add_token(T_BRACKETR, "]"); break;
+            case ',': add_token(T_COMMA, ","); break;
+            case ';': add_token(T_SEMICOLON, ";"); break;
+            case ':': add_token(T_COLON, ":"); break;
+            case '+': add_token(T_PLUS, "+"); break;
+            case '-': add_token(T_MINUS, "-"); break;
+            case '*': add_token(T_MULT, "*"); break;
+
+            // Operators that can be one or two characters
+            case '!': add_token(match('=') ? T_NOTEQUALS : T_NOT); break;
+            case '=': add_token(match('=') ? T_EQUALSOP : T_ASSIGNOP); break;
+            case '<': add_token(match('=') ? T_LESSEQUAL : (match('<') ? T_OUTPUTOP : T_LESSTHAN)); break;
+            case '>': add_token(match('=') ? T_GREATEREQUAL : (match('>') ? T_INPUTOP : T_GREATERTHAN)); break;
+
+            case '&': if (match('&')) { add_token(T_AND); } else { unknown_character(c); } break;
+            case '|': if (match('|')) { add_token(T_OR); } else { unknown_character(c); } break;
+
+            // Comments
+            case '/':
+                if (match('/')) {
+                    // A single-line comment goes until the end of the line.
+                    while (peek() != '\n' && !is_at_end()) advance();
+                } else if (match('*')) {
+                    // A multi-line comment
+                    handle_multiline_comment();
+                } else {
+                    add_token(T_DIV, "/");
+                }
+                break;
+
+            // Whitespace
+            case ' ':
+            case '\r':
+            case '\t':
+                // Ignore whitespace.
+                break;
+            case '\n':
+                lineNumber++;
+                break;
+            
+            // String literals
+            case '"': handle_string(); break;
+
+            default:
+                if (isdigit(c)) {
+                    handle_number();
+                } else if (isalpha(c) || c == '_') {
+                    handle_identifier();
+                } else {
+                    unknown_character(c);
+                }
+                break;
+        }
+    }
+
+    // --- Helper functions for scanning different token types ---
+
+    void handle_multiline_comment() {
+        size_t startLine = lineNumber;
+        while (!(peek() == '*' && peek_next() == '/') && !is_at_end()) {
+            if (peek() == '\n') lineNumber++;
+            advance();
+        }
+
+        if (is_at_end()) {
+            // ✅ REQUIREMENT: Unclosed multi-line comment error
+            errors.push_back("Error: Unclosed multi-line comment starting at line " + to_string(startLine));
+            return;
+        }
+
+        // Consume the closing "*/"
+        advance();
+        advance();
+    }
+
+    void handle_string() {
+        size_t startLine = lineNumber;
+        string value;
+        while (peek() != '"' && !is_at_end()) {
+            if (peek() == '\n') lineNumber++;
+            // Handle escape sequences
+            if (peek() == '\\' && !is_at_end()) {
+                advance(); // consume '\'
+                switch (peek()) {
+                    case 'n': value += '\n'; break;
+                    case 't': value += '\t'; break;
+                    case '"': value += '"'; break;
+                    case '\\': value += '\\'; break;
+                    default: value += peek(); break;
+                }
+            } else {
+                value += peek();
+            }
+            advance();
+        }
+
+        if (is_at_end()) {
+            // ✅ REQUIREMENT: Unclosed string literal error
+            errors.push_back("Error: Unclosed string literal starting at line " + to_string(startLine));
+            return;
+        }
+
+        // Consume the closing "
+        advance();
+        add_token(T_STRINGLIT, value);
+    }
+    
+    void handle_number() {
+        size_t start = pos - 1;
+        while (isdigit(peek())) advance();
+
+        // Look for a fractional part.
+        if (peek() == '.' && isdigit(peek_next())) {
+            // Consume the "."
+            advance();
+            while (isdigit(peek())) advance();
+            add_token(T_FLOATLIT, source.substr(start, pos - start));
+        } else {
+            add_token(T_INTLIT, source.substr(start, pos - start));
+        }
+
+        // ✅ REQUIREMENT: Check for variable names starting with numbers
+        if (isalpha(peek()) || peek() == '_') {
+            errors.push_back("Error at line " + to_string(lineNumber) + ": Invalid identifier. Identifiers cannot start with a number.");
+            // Consume the rest of the invalid identifier to prevent cascade errors
+            while (isalnum(peek()) || peek() == '_') advance();
+        }
+    }
+
+    void handle_identifier() {
+        size_t start = pos - 1;
+        while (isalnum(peek()) || peek() == '_') advance();
+
+        string text = source.substr(start, pos - start);
+        TokenType type;
+        if (keywords.count(text)) {
+            type = keywords[text];
+        } else {
+            type = T_IDENTIFIER;
+        }
+        add_token(type, text);
+    }
+
+    void unknown_character(char c) {
+        // ✅ REQUIREMENT: Unknown character error
+        errors.push_back("Warning at line " + to_string(lineNumber) + ": Unknown character '" + c + "'");
+        add_token(T_UNKNOWN, string(1, c));
+    }
+
+
+    // --- Low-level helper functions ---
+
+    bool match(char expected) {
+        if (is_at_end()) return false;
+        if (source[pos] != expected) return false;
+        pos++;
+        return true;
+    }
+
+    void add_token(TokenType type) {
+        add_token(type, "");
+    }
+
+    void add_token(TokenType type, const string& value) {
+        tokens.push_back({type, value, lineNumber});
+    }
 };
 
-string tokenTypeToString(TokenType type)
-{
-    switch (type)
-    {
-    case T_FUNCTION:
-        return "T_FUNCTION";
-    case T_INT:
-        return "T_INT";
-    case T_FLOAT:
-        return "T_FLOAT";
-    case T_STRING:
-        return "T_STRING";
-    case T_BOOL:
-        return "T_BOOL";
-    case T_RETURN:
-        return "T_RETURN";
-    case T_IDENTIFIER:
-        return "T_IDENTIFIER";
-    case T_INTLIT:
-        return "T_INTLIT";
-    case T_FLOATLIT:
-        return "T_FLOATLIT";
-    case T_STRINGLIT:
-        return "T_STRINGLIT";
-    case T_BOOLLIT:
-        return "T_BOOLLIT";
-    case T_PARENL:
-        return "T_PARENL";
-    case T_PARENR:
-        return "T_PARENR";
-    case T_BRACEL:
-        return "T_BRACEL";
-    case T_BRACER:
-        return "T_BRACER";
-    case T_BRACKETL:
-        return "T_BRACKETL";
-    case T_BRACKETR:
-        return "T_BRACKETR";
-    case T_COMMA:
-        return "T_COMMA";
-    case T_SEMICOLON:
-        return "T_SEMICOLON";
-    case T_COLON:
-        return "T_COLON";
-    case T_QUOTES:
-        return "T_QUOTES";
-    case T_ASSIGNOP:
-        return "T_ASSIGNOP";
-    case T_EQUALSOP:
-        return "T_EQUALSOP";
-    case T_NOTEQUALS:
-        return "T_NOTEQUALS";
-    case T_LESSTHAN:
-        return "T_LESSTHAN";
-    case T_GREATERTHAN:
-        return "T_GREATERTHAN";
-    case T_LESSEQUAL:
-        return "T_LESSEQUAL";
-    case T_GREATEREQUAL:
-        return "T_GREATEREQUAL";
-    case T_PLUS:
-        return "T_PLUS";
-    case T_MINUS:
-        return "T_MINUS";
-    case T_MULT:
-        return "T_MULT";
-    case T_DIV:
-        return "T_DIV";
-    case T_AND:
-        return "T_AND";
-    case T_OR:
-        return "T_OR";
-    case T_NOT:
-        return "T_NOT";
-    case T_IF:
-        return "T_IF";
-    case T_ELSE:
-        return "T_ELSE";
-    case T_WHILE:
-        return "T_WHILE";
-    case T_FOR:
-        return "T_FOR";
-    case T_COMMENT:
-        return "T_COMMENT";
-    case T_UNKNOWN:
-        return "T_UNKNOWN";
-    case T_EOF:
-        return "T_EOF";
-    case T_OUTPUTOP:
-        return "T_OUTPUTOP";
-    case T_INPUTOP:
-        return "T_INPUTOP";
-    default:
-        return "UNKNOWN";
-    }
-}
+// --- Main function and printing helpers ---
+
+string tokenTypeToString(TokenType type); // Forward declaration
 
 int main()
 {
     ifstream file("test_input.txt");
-    if (!file)
-    {
+    if (!file) {
         cerr << "Error: Could not open test_input.txt" << endl;
         return 1;
     }
@@ -380,24 +286,47 @@ int main()
     Lexer lexer;
     vector<Token> tokens = lexer.tokenize(source);
 
-    cout << "Token stream:" << endl;
-    for (const auto &token : tokens)
-    {
-        if (token.type == T_STRINGLIT)
-        {
-            cout << tokenTypeToString(token.type) << "(\"" << token.value << "\") ";
+    // First, check for any errors found during tokenization
+    const auto& errors = lexer.getErrors();
+    if (!errors.empty()) {
+        cerr << "Lexical analysis failed with " << errors.size() << " errors:" << endl;
+        for (const string& err : errors) {
+            cerr << err << endl;
         }
-        else if (token.type == T_IDENTIFIER || token.type == T_INTLIT ||
-                 token.type == T_FLOATLIT || token.type == T_BOOLLIT)
-        {
-            cout << tokenTypeToString(token.type) << "(" << token.value << ") ";
-        }
-        else if (token.type != T_EOF)
-        {
-            cout << tokenTypeToString(token.type) << " ";
-        }
+        return 1; // Exit with an error code
     }
-    cout << endl;
+
+    // If no errors, print the token stream
+    cout << "Token stream:" << endl;
+    for (const auto &token : tokens) {
+        if (token.type == T_EOF) break;
+        cout << "<" << tokenTypeToString(token.type) << ", \"" << token.value << "\", line " << token.line << ">" << endl;
+    }
 
     return 0;
+}
+
+
+// Function to convert TokenType enum to a string for printing
+string tokenTypeToString(TokenType type) {
+    static const unordered_map<TokenType, string> typeMap = {
+        {T_FUNCTION, "T_FUNCTION"}, {T_INT, "T_INT"}, {T_FLOAT, "T_FLOAT"},
+        {T_STRING, "T_STRING"}, {T_BOOL, "T_BOOL"}, {T_RETURN, "T_RETURN"},
+        {T_IDENTIFIER, "T_IDENTIFIER"}, {T_INTLIT, "T_INTLIT"}, {T_FLOATLIT, "T_FLOATLIT"},
+        {T_STRINGLIT, "T_STRINGLIT"}, {T_BOOLLIT, "T_BOOLLIT"}, {T_PARENL, "T_PARENL"},
+        {T_PARENR, "T_PARENR"}, {T_BRACEL, "T_BRACEL"}, {T_BRACER, "T_BRACER"},
+        {T_BRACKETL, "T_BRACKETL"}, {T_BRACKETR, "T_BRACKETR"}, {T_COMMA, "T_COMMA"},
+        {T_SEMICOLON, "T_SEMICOLON"}, {T_COLON, "T_COLON"}, {T_ASSIGNOP, "T_ASSIGNOP"},
+        {T_EQUALSOP, "T_EQUALSOP"}, {T_NOTEQUALS, "T_NOTEQUALS"}, {T_LESSTHAN, "T_LESSTHAN"},
+        {T_GREATERTHAN, "T_GREATERTHAN"}, {T_LESSEQUAL, "T_LESSEQUAL"}, {T_GREATEREQUAL, "T_GREATEREQUAL"},
+        {T_PLUS, "T_PLUS"}, {T_MINUS, "T_MINUS"}, {T_MULT, "T_MULT"}, {T_DIV, "T_DIV"},
+        {T_AND, "T_AND"}, {T_OR, "T_OR"}, {T_NOT, "T_NOT"}, {T_IF, "T_IF"},
+        {T_ELSE, "T_ELSE"}, {T_WHILE, "T_WHILE"}, {T_FOR, "T_FOR"}, {T_COMMENT, "T_COMMENT"},
+        {T_UNKNOWN, "T_UNKNOWN"}, {T_EOF, "T_EOF"}, {T_OUTPUTOP, "T_OUTPUTOP"}, {T_INPUTOP, "T_INPUTOP"}
+    };
+    auto it = typeMap.find(type);
+    if (it != typeMap.end()) {
+        return it->second;
+    }
+    return "UNKNOWN_TOKEN_TYPE";
 }
