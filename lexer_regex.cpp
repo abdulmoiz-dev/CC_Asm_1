@@ -52,9 +52,13 @@ enum TokenType
     T_FOR,
     T_COMMENT,
     T_UNKNOWN,
+
     T_EOF,
     T_OUTPUTOP,
     T_INPUTOP
+
+    T_EOF
+
 };
 
 struct Token
@@ -74,8 +78,10 @@ private:
         {"fn", T_FUNCTION}, {"int", T_INT}, {"float", T_FLOAT}, {"string", T_STRING}, {"bool", T_BOOL}, {"return", T_RETURN}, {"if", T_IF}, {"else", T_ELSE}, {"while", T_WHILE}, {"for", T_FOR}, {"true", T_BOOLLIT}, {"false", T_BOOLLIT}};
 
     unordered_map<string, TokenType> operators = {
+
         {"=", T_ASSIGNOP}, {"==", T_EQUALSOP}, {"!=", T_NOTEQUALS}, {"<", T_LESSTHAN}, {">", T_GREATERTHAN}, {"<=", T_LESSEQUAL}, {">=", T_GREATEREQUAL}, {"+", T_PLUS}, {"-", T_MINUS}, {"*", T_MULT}, {"/", T_DIV}, {"&&", T_AND}, {"||", T_OR}, {"!", T_NOT}, {"<<", T_OUTPUTOP}, {">>", T_INPUTOP} // Add these
     };
+
 
 public:
     Lexer() : lineNumber(1) {}
@@ -88,6 +94,7 @@ public:
 
         while (!remaining.empty())
         {
+
             if (isspace(remaining[0]))
             {
                 if (remaining[0] == '\n')
@@ -95,6 +102,7 @@ public:
                 remaining = remaining.substr(1);
                 continue;
             }
+
 
             if (remaining.size() >= 2 && remaining.substr(0, 2) == "//")
             {
@@ -113,7 +121,6 @@ public:
                     cerr << "Error: Unclosed comment at line " << lineNumber << endl;
                     break;
                 }
-
                 string commentPart = remaining.substr(0, end + 2);
                 int newlines = count(commentPart.begin(), commentPart.end(), '\n');
                 lineNumber += newlines;
@@ -188,7 +195,6 @@ public:
 
             else
             {
-
                 bool opMatched = false;
                 if (remaining.size() >= 2)
                 {
@@ -348,10 +354,12 @@ string tokenTypeToString(TokenType type)
         return "T_UNKNOWN";
     case T_EOF:
         return "T_EOF";
+
     case T_OUTPUTOP:
         return "T_OUTPUTOP";
     case T_INPUTOP:
         return "T_INPUTOP";
+
     default:
         return "UNKNOWN";
     }
