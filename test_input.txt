@@ -1,26 +1,15 @@
-fn int my_fn(int x, float y) {
-    string my_str = "hmm";
-    bool my_bool = x == 40;
-    return x;
-}
+// This is a valid variable
+int my_var = 123;
 
-// This is a comment
-int another_fn() {
-    float pi = 3.14;
-    string escaped = "Hello\nWorld\t\"Quoted\"";
-    bool flag = true;
-    
-    if (x <= 50 && y >= 20) {
-        return x * y + 10;
-    }
-    
-    for (int i = 0; i < 10; i++) {
-        cout << "Iteration: " << i << endl;
-    }
-    
-    /* Multi-line this should eb ignored
-       comment */
-    int arr[5] = {1, 2, 3, 4, 5};
-    
-    return 0;
-}
+// This should cause an error
+int 9lives = 9; 
+
+// This is an unclosed string
+string name = "John Doe; 
+
+/* This is a multi-line comment.
+   It is also not closed.
+   It should produce an error.
+
+// This is an unknown character
+int result = 5 # 4;

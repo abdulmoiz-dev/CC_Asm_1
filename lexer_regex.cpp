@@ -8,8 +8,7 @@
 
 using namespace std;
 
-// Enum remains the same, but T_QUOTES is no longer needed
-// as strings are now a single token.
+
 enum TokenType
 {
     T_FUNCTION, T_INT, T_FLOAT, T_STRING, T_BOOL, T_RETURN, T_IDENTIFIER,
@@ -155,7 +154,6 @@ private:
         }
     }
 
-    // --- Helper functions for scanning different token types ---
 
     void handle_multiline_comment() {
         size_t startLine = lineNumber;
@@ -250,8 +248,6 @@ private:
     }
 
 
-    // --- Low-level helper functions ---
-
     bool match(char expected) {
         if (is_at_end()) return false;
         if (source[pos] != expected) return false;
@@ -307,7 +303,7 @@ int main()
 }
 
 
-// Function to convert TokenType enum to a string for printing
+
 string tokenTypeToString(TokenType type) {
     static const unordered_map<TokenType, string> typeMap = {
         {T_FUNCTION, "T_FUNCTION"}, {T_INT, "T_INT"}, {T_FLOAT, "T_FLOAT"},
