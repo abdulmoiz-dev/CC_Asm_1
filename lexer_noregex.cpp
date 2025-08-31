@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 #include <set>
+#include <fstream>
+#include <cctype>
 
 using namespace std;
 
@@ -24,7 +26,6 @@ struct Token {
     int column;
 };
 
-// List of keywords for comparison
 const set<string> keywords = {
     "fn", "int", "float", "string", "bool",
     "return", "if", "else", "for", "while",
@@ -39,7 +40,6 @@ vector<Token> tokenize(const string& src) {
     while (pos < src.size()) {
         char c = src[pos];
 
-        // Skip whitespace
         if (isspace(c)) {
             if (c == '\n') { line++; col = 1; }
             else col++;
@@ -47,7 +47,6 @@ vector<Token> tokenize(const string& src) {
             continue;
         }
 
-        // Identifier or keyword (Unicode supported)
         if (isalpha(c) || c == '_' || (unsigned char)c >= 128) {
             int startCol = col;
             string acc;
@@ -80,7 +79,6 @@ vector<Token> tokenize(const string& src) {
             continue;
         }
 
-        // Number literal
         if (isdigit(c)) {
             int startCol = col;
             string acc;
@@ -94,13 +92,13 @@ vector<Token> tokenize(const string& src) {
                 pos++;
                 col++;
             }
-            // Check invalid identifier like 123abc
             if (pos < src.size() && (isalpha(src[pos]) || src[pos]=='_')) {
                 while (pos < src.size() && (isalnum(src[pos]) || src[pos]=='_')) {
                     acc += src[pos];
                     pos++;
                     col++;
                 }
+                cerr << "LexerError: Invalid identifier '" << acc << "' at Line " << line << ", Col " << startCol << endl;
                 tokens.push_back({T_INVALID_IDENTIFIER, acc, line, startCol});
             } else {
                 tokens.push_back(dotSeen ? Token{T_FLOATLIT, acc, line, startCol} : Token{T_INTLIT, acc, line, startCol});
@@ -108,11 +106,11 @@ vector<Token> tokenize(const string& src) {
             continue;
         }
 
-        // String literal
         if (c == '"') {
             int startCol = col;
+            int startLine = line;
             string acc;
-            pos++; col++; // skip opening "
+            pos++; col++;
             while (pos < src.size() && src[pos] != '"') {
                 char ch = src[pos++];
                 col++;
@@ -127,43 +125,56 @@ vector<Token> tokenize(const string& src) {
                     else acc += esc;
                 } else acc += ch;
             }
-            if (pos < src.size() && src[pos] == '"') { pos++; col++; }
-            tokens.push_back({T_STRINGLIT, acc, line, startCol});
-            continue;
-        }
-
-        // Comments
-        if (c == '/' && pos+1 < src.size() && src[pos+1]=='/') {
-            int startCol = col;
-            string acc;
-            pos += 2; col += 2;
-            while (pos < src.size() && src[pos] != '\n') { acc += src[pos]; pos++; col++; }
-            tokens.push_back({T_COMMENT, acc, line, startCol});
-            continue;
-        }
-        if (c == '/' && pos+1 < src.size() && src[pos+1]=='*') {
-            int startCol = col;
-            string acc;
-            pos += 2; col += 2;
-            while (pos+1 < src.size() && !(src[pos]=='*' && src[pos+1]=='/')) {
-                acc += src[pos];
-                if (src[pos] == '\n') { line++; col = 1; } else col++;
-                pos++;
+            if (pos >= src.size()) {
+                cerr << "LexerError: Unclosed string literal at Line " << startLine << ", Col " << startCol << endl;
+                tokens.push_back({T_UNKNOWN, acc, startLine, startCol});
+            } else {
+                pos++; col++;
+                tokens.push_back({T_STRINGLIT, acc, startLine, startCol});
             }
-            if (pos+1 < src.size()) { pos += 2; col += 2; }
-            tokens.push_back({T_COMMENT, acc, line, startCol});
             continue;
         }
 
-        // Symbols & operators
+        if (c == '/' && pos + 1 < src.size()) {
+            if (src[pos + 1] == '/') {
+                int startCol = col;
+                pos += 2; col += 2;
+                while (pos < src.size() && src[pos] != '\n') {
+                    pos++; col++;
+                }
+                continue;
+            }
+            if (src[pos + 1] == '*') {
+                int startCol = col;
+                int startLine = line;
+                pos += 2; col += 2;
+                while (pos + 1 < src.size() && !(src[pos] == '*' && src[pos + 1] == '/')) {
+                    if (src[pos] == '\n') { line++; col = 1; }
+                    else col++;
+                    pos++;
+                }
+                if (pos + 1 >= src.size()) {
+                    cerr << "LexerError: Unclosed multi-line comment at Line " << startLine << ", Col " << startCol << endl;
+                    tokens.push_back({T_UNKNOWN, "/*...", startLine, startCol});
+                } else {
+                    pos += 2; col += 2;
+                }
+                continue;
+            }
+        }
+
         int startCol = col;
         string val(1, c);
         pos++; col++;
-        if (c == '=' && pos < src.size() && src[pos]=='=') { val = "=="; pos++; col++; tokens.push_back({T_EQUALSOP,val,line,startCol}); continue; }
-        else if (c == '+' && pos < src.size() && src[pos]=='+') { val = "++"; pos++; col++; tokens.push_back({T_INCREMENT,val,line,startCol}); continue; }
-        else if (c == '+' && pos < src.size() && src[pos]=='=') { val = "+="; pos++; col++; tokens.push_back({T_PLUS_ASSIGN,val,line,startCol}); continue; }
+        if (c == '=' && pos < src.size() && src[pos] == '=') { val = "=="; pos++; col++; tokens.push_back({T_EQUALSOP, val, line, startCol}); continue; }
+        else if (c == '!' && pos < src.size() && src[pos] == '=') { val = "!="; pos++; col++; tokens.push_back({T_NEQ, val, line, startCol}); continue; }
+        else if (c == '<' && pos < src.size() && src[pos] == '=') { val = "<="; pos++; col++; tokens.push_back({T_LTE, val, line, startCol}); continue; }
+        else if (c == '>' && pos < src.size() && src[pos] == '=') { val = ">="; pos++; col++; tokens.push_back({T_GTE, val, line, startCol}); continue; }
+        else if (c == '&' && pos < src.size() && src[pos] == '&') { val = "&&"; pos++; col++; tokens.push_back({T_AND, val, line, startCol}); continue; }
+        else if (c == '|' && pos < src.size() && src[pos] == '|') { val = "||"; pos++; col++; tokens.push_back({T_OR, val, line, startCol}); continue; }
+        else if (c == '+' && pos < src.size() && src[pos] == '+') { val = "++"; pos++; col++; tokens.push_back({T_INCREMENT, val, line, startCol}); continue; }
+        else if (c == '+' && pos < src.size() && src[pos] == '=') { val = "+="; pos++; col++; tokens.push_back({T_PLUS_ASSIGN, val, line, startCol}); continue; }
 
-        // Map single-character symbols
         TokenType type = T_UNKNOWN;
         if (c == '+') type = T_PLUS;
         else if (c == '-') type = T_MINUS;
@@ -190,15 +201,18 @@ vector<Token> tokenize(const string& src) {
         else if (c == '.') type = T_DOT;
         else if (c == '=') type = T_ASSIGNOP;
 
-        tokens.push_back({type,val,line,startCol});
+        if (type == T_UNKNOWN) {
+            cerr << "LexerError: Unknown character '" << val << "' at Line " << line << ", Col " << startCol << endl;
+        }
+        tokens.push_back({type, val, line, startCol});
     }
 
-    tokens.push_back({T_EOF,"",line,col});
+    tokens.push_back({T_EOF, "", line, col});
     return tokens;
 }
-// Helper function to get token type as string
+
 string tokenTypeToString(TokenType type) {
-    switch(type) {
+    switch (type) {
         case T_FUNCTION: return "T_FUNCTION";
         case T_INT: return "T_INT";
         case T_FLOAT: return "T_FLOAT";
@@ -259,19 +273,19 @@ string tokenTypeToString(TokenType type) {
 }
 
 int main() {
-    // Sample program to test lexer
-    string code = R"(fn int my_fn(int x, float y) {
-    string my_str = "hello 🌟";
-    bool my_bool = x == 40;
-    return x;
-})";
+    ifstream file("test_input2.txt");
+    if (!file) {
+        cerr << "Error: Could not open file 'test_input2.txt'" << endl;
+        return 1;
+    }
 
-    vector<Token> tokens = tokenize(code);
+    string source((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+    file.close();
 
-    // Print all tokens
-    for (size_t i = 0; i < tokens.size(); i++) {
-        Token t = tokens[i];
-        cout << tokenTypeToString(t.type) << "\t\"" << t.value 
+    vector<Token> tokens = tokenize(source);
+
+    for (const auto& t : tokens) {
+        cout << tokenTypeToString(t.type) << "\t\"" << t.value
              << "\"\tLine: " << t.line << "\tCol: " << t.column << endl;
     }
 
