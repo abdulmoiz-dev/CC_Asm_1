@@ -8,7 +8,7 @@
 using namespace std;
 
 enum TokenType {
-    T_FUNCTION, T_INT, T_FLOAT, T_STRING, T_BOOL, T_RETURN,
+    T_INT, T_FLOAT, T_STRING, T_BOOL, T_RETURN,
     T_IF, T_ELSE, T_FOR, T_WHILE, T_BREAK, T_CONTINUE,
     T_IDENTIFIER, T_INTLIT, T_FLOATLIT, T_STRINGLIT, T_BOOLLIT,
     T_ASSIGNOP, T_EQUALSOP, T_PLUS, T_MINUS, T_MULT, T_DIV, T_MOD,
@@ -27,7 +27,7 @@ struct Token {
 };
 
 const set<string> keywords = {
-    "fn", "int", "float", "string", "bool",
+    "int", "float", "string", "bool",
     "return", "if", "else", "for", "while",
     "break", "continue", "true", "false"
 };
@@ -42,7 +42,7 @@ vector<Token> tokenize(const string& src) {
 
         if (isspace(c)) {
             if (c == '\n') { line++; col = 1; }
-            else col++;
+            else { col++; }
             pos++;
             continue;
         }
@@ -50,18 +50,14 @@ vector<Token> tokenize(const string& src) {
         if (isalpha(c) || c == '_' || (unsigned char)c >= 128) {
             int startCol = col;
             string acc;
-            while (pos < src.size()) {
-                unsigned char ch = src[pos];
-                if (isalnum(ch) || ch == '_' || ch >= 128) {
-                    acc += ch;
-                    pos++;
-                    col++;
-                } else break;
+            while (pos < src.size() && (isalnum(src[pos]) || src[pos] == '_' || (unsigned char)src[pos] >= 128)) {
+                acc += src[pos];
+                pos++;
+                col++;
             }
 
             if (keywords.count(acc)) {
                 if (acc == "true" || acc == "false") tokens.push_back({T_BOOLLIT, acc, line, startCol});
-                else if (acc == "fn") tokens.push_back({T_FUNCTION, acc, line, startCol});
                 else if (acc == "int") tokens.push_back({T_INT, acc, line, startCol});
                 else if (acc == "float") tokens.push_back({T_FLOAT, acc, line, startCol});
                 else if (acc == "string") tokens.push_back({T_STRING, acc, line, startCol});
@@ -83,11 +79,8 @@ vector<Token> tokenize(const string& src) {
             int startCol = col;
             string acc;
             bool dotSeen = false;
-            while (pos < src.size() && (isdigit(src[pos]) || src[pos] == '.')) {
-                if (src[pos] == '.') {
-                    if (dotSeen) break;
-                    dotSeen = true;
-                }
+            while (pos < src.size() && (isdigit(src[pos]) || (src[pos] == '.' && !dotSeen))) {
+                if (src[pos] == '.') { dotSeen = true; }
                 acc += src[pos];
                 pos++;
                 col++;
@@ -110,25 +103,29 @@ vector<Token> tokenize(const string& src) {
             int startCol = col;
             int startLine = line;
             string acc;
-            pos++; col++;
-            while (pos < src.size() && src[pos] != '"') {
-                char ch = src[pos++];
-                col++;
-                if (ch == '\\' && pos < src.size()) {
-                    char esc = src[pos++];
-                    col++;
-                    if (esc == 'n') acc += '\n';
-                    else if (esc == 't') acc += '\t';
-                    else if (esc == 'r') acc += '\r';
-                    else if (esc == '\\') acc += '\\';
-                    else if (esc == '"') acc += '"';
-                    else acc += esc;
-                } else acc += ch;
+            pos++; // Consume opening quote
+            col++;
+            while (pos < src.size() && src[pos] != '"' && src[pos] != '\n') {
+                if (src[pos] == '\\') { // Handle escape sequences
+                    pos++; col++;
+                    if (pos >= src.size()) break;
+                    switch(src[pos]) {
+                        case 'n': acc += '\n'; break;
+                        case 't': acc += '\t'; break;
+                        case 'r': acc += '\r'; break;
+                        case '"': acc += '"'; break;
+                        case '\\': acc += '\\'; break;
+                        default: acc += src[pos]; break;
+                    }
+                } else {
+                    acc += src[pos];
+                }
+                pos++; col++;
             }
-            if (pos >= src.size()) {
+            if (pos >= src.size() || src[pos] == '\n') {
                 cerr << "LexerError: Unclosed string literal at Line " << startLine << ", Col " << startCol << endl;
                 tokens.push_back({T_UNKNOWN, acc, startLine, startCol});
-            } else {
+            } else { // Found closing quote
                 pos++; col++;
                 tokens.push_back({T_STRINGLIT, acc, startLine, startCol});
             }
@@ -137,27 +134,25 @@ vector<Token> tokenize(const string& src) {
 
         if (c == '/' && pos + 1 < src.size()) {
             if (src[pos + 1] == '/') {
-                int startCol = col;
-                pos += 2; col += 2;
-                while (pos < src.size() && src[pos] != '\n') {
-                    pos++; col++;
-                }
+                pos += 2;
+                while (pos < src.size() && src[pos] != '\n') { pos++; }
                 continue;
             }
             if (src[pos + 1] == '*') {
                 int startCol = col;
                 int startLine = line;
-                pos += 2; col += 2;
+                pos += 2;
                 while (pos + 1 < src.size() && !(src[pos] == '*' && src[pos + 1] == '/')) {
                     if (src[pos] == '\n') { line++; col = 1; }
-                    else col++;
+                    else { col++; }
                     pos++;
                 }
                 if (pos + 1 >= src.size()) {
-                    cerr << "LexerError: Unclosed multi-line comment at Line " << startLine << ", Col " << startCol << endl;
+                    cerr << "LexerError: Unclosed multi-line comment starting at Line " << startLine << ", Col " << startCol << endl;
                     tokens.push_back({T_UNKNOWN, "/*...", startLine, startCol});
+                    break; // Critical Error: Stop tokenizing
                 } else {
-                    pos += 2; col += 2;
+                    pos += 2;
                 }
                 continue;
             }
@@ -213,7 +208,6 @@ vector<Token> tokenize(const string& src) {
 
 string tokenTypeToString(TokenType type) {
     switch (type) {
-        case T_FUNCTION: return "T_FUNCTION";
         case T_INT: return "T_INT";
         case T_FLOAT: return "T_FLOAT";
         case T_STRING: return "T_STRING";
@@ -278,14 +272,22 @@ int main() {
         cerr << "Error: Could not open file 'test_input2.txt'" << endl;
         return 1;
     }
-
     string source((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
     file.close();
 
     vector<Token> tokens = tokenize(source);
 
+    cout << "--- Token Stream ---" << endl;
     for (const auto& t : tokens) {
-        cout << tokenTypeToString(t.type) << "\t\"" << t.value
+        // Replace non-printable chars for clean output
+        string val_printable;
+        for (char ch : t.value) {
+            if (ch == '\n') val_printable += "\\n";
+            else if (ch == '\t') val_printable += "\\t";
+            else if (ch == '\r') val_printable += "\\r";
+            else val_printable += ch;
+        }
+        cout << tokenTypeToString(t.type) << "\t\"" << val_printable
              << "\"\tLine: " << t.line << "\tCol: " << t.column << endl;
     }
 

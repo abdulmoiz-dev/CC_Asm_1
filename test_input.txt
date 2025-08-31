@@ -2,14 +2,15 @@
 int my_var = 123;
 
 // This should cause an error
-int 9lives = 9; 
+int lives = 9; 
 
 // This is an unclosed string
-string name = "John Doe; 
+string name = "John Doe"; 
 
 /* This is a multi-line comment.
    It is also not closed.
    It should produce an error.
+*/
 
 // This is an unknown character
-int result = 5 # 4;
+int result = 54;

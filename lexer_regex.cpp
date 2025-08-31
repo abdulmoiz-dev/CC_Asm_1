@@ -46,7 +46,7 @@ private:
 public:
     Lexer() = default;
 
-    // Main tokenization function
+
     vector<Token> tokenize(const string &source_code)
     {
         source = source_code;
@@ -87,13 +87,13 @@ private:
         return source[pos + 1];
     }
 
-    // Main scanner dispatch
+    
     void scan_token()
     {
         char c = advance();
         switch (c)
         {
-            // Single-character tokens
+            
             case '(': add_token(T_PARENL, "("); break;
             case ')': add_token(T_PARENR, ")"); break;
             case '{': add_token(T_BRACEL, "{"); break;
@@ -107,7 +107,7 @@ private:
             case '-': add_token(T_MINUS, "-"); break;
             case '*': add_token(T_MULT, "*"); break;
 
-            // Operators that can be one or two characters
+            
             case '!': add_token(match('=') ? T_NOTEQUALS : T_NOT); break;
             case '=': add_token(match('=') ? T_EQUALSOP : T_ASSIGNOP); break;
             case '<': add_token(match('=') ? T_LESSEQUAL : (match('<') ? T_OUTPUTOP : T_LESSTHAN)); break;
@@ -116,30 +116,30 @@ private:
             case '&': if (match('&')) { add_token(T_AND); } else { unknown_character(c); } break;
             case '|': if (match('|')) { add_token(T_OR); } else { unknown_character(c); } break;
 
-            // Comments
+            
             case '/':
                 if (match('/')) {
-                    // A single-line comment goes until the end of the line.
+                    
                     while (peek() != '\n' && !is_at_end()) advance();
                 } else if (match('*')) {
-                    // A multi-line comment
+                    
                     handle_multiline_comment();
                 } else {
                     add_token(T_DIV, "/");
                 }
                 break;
 
-            // Whitespace
+            
             case ' ':
             case '\r':
             case '\t':
-                // Ignore whitespace.
+                
                 break;
             case '\n':
                 lineNumber++;
                 break;
             
-            // String literals
+            
             case '"': handle_string(); break;
 
             default:
@@ -163,12 +163,12 @@ private:
         }
 
         if (is_at_end()) {
-            // ✅ REQUIREMENT: Unclosed multi-line comment error
+            
             errors.push_back("Error: Unclosed multi-line comment starting at line " + to_string(startLine));
             return;
         }
 
-        // Consume the closing "*/"
+        
         advance();
         advance();
     }
@@ -178,9 +178,9 @@ private:
         string value;
         while (peek() != '"' && !is_at_end()) {
             if (peek() == '\n') lineNumber++;
-            // Handle escape sequences
+            
             if (peek() == '\\' && !is_at_end()) {
-                advance(); // consume '\'
+                advance(); 
                 switch (peek()) {
                     case 'n': value += '\n'; break;
                     case 't': value += '\t'; break;
@@ -195,12 +195,12 @@ private:
         }
 
         if (is_at_end()) {
-            // ✅ REQUIREMENT: Unclosed string literal error
+            
             errors.push_back("Error: Unclosed string literal starting at line " + to_string(startLine));
             return;
         }
 
-        // Consume the closing "
+        
         advance();
         add_token(T_STRINGLIT, value);
     }
@@ -209,9 +209,9 @@ private:
         size_t start = pos - 1;
         while (isdigit(peek())) advance();
 
-        // Look for a fractional part.
+        
         if (peek() == '.' && isdigit(peek_next())) {
-            // Consume the "."
+            
             advance();
             while (isdigit(peek())) advance();
             add_token(T_FLOATLIT, source.substr(start, pos - start));
@@ -219,10 +219,10 @@ private:
             add_token(T_INTLIT, source.substr(start, pos - start));
         }
 
-        // ✅ REQUIREMENT: Check for variable names starting with numbers
+        
         if (isalpha(peek()) || peek() == '_') {
             errors.push_back("Error at line " + to_string(lineNumber) + ": Invalid identifier. Identifiers cannot start with a number.");
-            // Consume the rest of the invalid identifier to prevent cascade errors
+            
             while (isalnum(peek()) || peek() == '_') advance();
         }
     }
@@ -242,7 +242,7 @@ private:
     }
 
     void unknown_character(char c) {
-        // ✅ REQUIREMENT: Unknown character error
+        
         errors.push_back("Warning at line " + to_string(lineNumber) + ": Unknown character '" + c + "'");
         add_token(T_UNKNOWN, string(1, c));
     }
@@ -264,9 +264,9 @@ private:
     }
 };
 
-// --- Main function and printing helpers ---
 
-string tokenTypeToString(TokenType type); // Forward declaration
+
+string tokenTypeToString(TokenType type); 
 
 int main()
 {
@@ -282,17 +282,17 @@ int main()
     Lexer lexer;
     vector<Token> tokens = lexer.tokenize(source);
 
-    // First, check for any errors found during tokenization
+    
     const auto& errors = lexer.getErrors();
     if (!errors.empty()) {
         cerr << "Lexical analysis failed with " << errors.size() << " errors:" << endl;
         for (const string& err : errors) {
             cerr << err << endl;
         }
-        return 1; // Exit with an error code
+        return 1; 
     }
 
-    // If no errors, print the token stream
+    
     cout << "Token stream:" << endl;
     for (const auto &token : tokens) {
         if (token.type == T_EOF) break;

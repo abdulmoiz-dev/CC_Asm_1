@@ -1,0 +1,31 @@
+// this is now a C++ style function.
+int calculateΩ(int α, int β) {
+    // Identifiers with Greek letters are supported.
+    // Это тестовый комментарий (This is a test comment)
+    
+    string greeting = "Hello, κόσμε! 👋"; // A string with Greek and an emoji.
+    
+    // An identifier using Cyrillic characters.
+    int переменная = 100;
+    
+    if (переменная > 50) {
+        // Emoji in an identifier (lexically valid, but likely not compilable in standard C++).
+        int 👑_value = 1;
+        return 👑_value + α;
+    }
+    
+    return β;
+}
+
+// This is a valid variable
+int my_var = 12 _ 3;
+
+// This should cause an error
+int 9lives = 9; 
+
+// This is an unclosed string
+string name = "John Doe; 
+
+/* This is a multi-line comment.
+   It is also not closed.
+   It should produce an error.
