@@ -52,13 +52,9 @@ enum TokenType
     T_FOR,
     T_COMMENT,
     T_UNKNOWN,
-
     T_EOF,
     T_OUTPUTOP,
     T_INPUTOP
-
-    T_EOF
-
 };
 
 struct Token
@@ -78,10 +74,7 @@ private:
         {"fn", T_FUNCTION}, {"int", T_INT}, {"float", T_FLOAT}, {"string", T_STRING}, {"bool", T_BOOL}, {"return", T_RETURN}, {"if", T_IF}, {"else", T_ELSE}, {"while", T_WHILE}, {"for", T_FOR}, {"true", T_BOOLLIT}, {"false", T_BOOLLIT}};
 
     unordered_map<string, TokenType> operators = {
-
-        {"=", T_ASSIGNOP}, {"==", T_EQUALSOP}, {"!=", T_NOTEQUALS}, {"<", T_LESSTHAN}, {">", T_GREATERTHAN}, {"<=", T_LESSEQUAL}, {">=", T_GREATEREQUAL}, {"+", T_PLUS}, {"-", T_MINUS}, {"*", T_MULT}, {"/", T_DIV}, {"&&", T_AND}, {"||", T_OR}, {"!", T_NOT}, {"<<", T_OUTPUTOP}, {">>", T_INPUTOP} // Add these
-    };
-
+        {"=", T_ASSIGNOP}, {"==", T_EQUALSOP}, {"!=", T_NOTEQUALS}, {"<", T_LESSTHAN}, {">", T_GREATERTHAN}, {"<=", T_LESSEQUAL}, {">=", T_GREATEREQUAL}, {"+", T_PLUS}, {"-", T_MINUS}, {"*", T_MULT}, {"/", T_DIV}, {"&&", T_AND}, {"||", T_OR}, {"!", T_NOT}, {"<<", T_OUTPUTOP}, {">>", T_INPUTOP}};
 
 public:
     Lexer() : lineNumber(1) {}
@@ -94,7 +87,7 @@ public:
 
         while (!remaining.empty())
         {
-
+            // Skip whitespace
             if (isspace(remaining[0]))
             {
                 if (remaining[0] == '\n')
@@ -103,7 +96,7 @@ public:
                 continue;
             }
 
-
+            // Check for comments
             if (remaining.size() >= 2 && remaining.substr(0, 2) == "//")
             {
                 size_t end = remaining.find('\n');
@@ -130,6 +123,7 @@ public:
 
             bool matched = false;
 
+            // Try to match identifiers and keywords
             regex identRegex("^[a-zA-Z_][a-zA-Z0-9_]*");
             smatch match;
             if (regex_search(remaining, match, identRegex))
@@ -146,7 +140,7 @@ public:
                 remaining = remaining.substr(ident.length());
                 matched = true;
             }
-
+            // Try to match numbers
             else if (regex_search(remaining, match, regex("^\\d+\\.\\d+")))
             {
                 tokens.push_back({T_FLOATLIT, match.str(), lineNumber});
@@ -159,9 +153,12 @@ public:
                 remaining = remaining.substr(match.str().length());
                 matched = true;
             }
-
+            // Try to match string literals
             else if (remaining[0] == '"')
             {
+                // Add opening quote token
+                tokens.push_back({T_QUOTES, "\"", lineNumber});
+
                 size_t end = 1;
                 bool escaped = false;
                 while (end < remaining.length())
@@ -189,12 +186,17 @@ public:
 
                 string strLit = remaining.substr(1, end - 1);
                 tokens.push_back({T_STRINGLIT, strLit, lineNumber});
+
+                // Add closing quote token
+                tokens.push_back({T_QUOTES, "\"", lineNumber});
+
                 remaining = remaining.substr(end + 1);
                 matched = true;
             }
-
+            // Try to match operators and punctuation
             else
             {
+                // Check multi-character operators first
                 bool opMatched = false;
                 if (remaining.size() >= 2)
                 {
@@ -354,12 +356,10 @@ string tokenTypeToString(TokenType type)
         return "T_UNKNOWN";
     case T_EOF:
         return "T_EOF";
-
     case T_OUTPUTOP:
         return "T_OUTPUTOP";
     case T_INPUTOP:
         return "T_INPUTOP";
-
     default:
         return "UNKNOWN";
     }
