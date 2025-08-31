@@ -12,6 +12,7 @@ BONUS:
 run this in cmd,
 
 chcp 65001
+
 to run in UTF-8 mode for Unicode character support e.g emojis or non-latin characters for identifier names, string literals, etc.
 
 
