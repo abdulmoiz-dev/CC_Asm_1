@@ -9,9 +9,12 @@ g++ -std=c++11 -o lexer_noregex lexer_noregex.cpp
 
 # Run the non-regex version
 BONUS:
-run this in cmd, to run in UTF-8 mode for Unicode character support e.g emojis or non-latin characters for identifier names, string literals, etc.
+run this in cmd,
 
 chcp 65001
+
+to run in UTF-8 mode for Unicode character support e.g emojis or non-latin characters for identifier names, string literals, etc.
+
 
 Run command:
 ./lexer_noregex
