@@ -79,23 +79,27 @@ vector<Token> tokenize(const string& src) {
             int startCol = col;
             string acc;
             bool dotSeen = false;
-            while (pos < src.size() && (isdigit(src[pos]) || (src[pos] == '.' && !dotSeen))) {
-                if (src[pos] == '.') { dotSeen = true; }
-                acc += src[pos];
+            while (pos < src.size()) {
+                if (isdigit(src[pos])) {
+                    acc += src[pos];
+                } 
+                else if (src[pos] == '.') {
+                    if (dotSeen) {
+                        cerr << "LexerError: Multiple decimal points in number '" 
+                            << acc << "' at Line " << line << ", Col " << startCol << endl;
+                        tokens.push_back({T_INVALID_IDENTIFIER, acc, line, startCol});
+                        return tokens; // or handle appropriately
+                    }
+                    dotSeen = true;
+                    acc += '.';
+                } 
+                else break;
+
                 pos++;
                 col++;
             }
-            if (pos < src.size() && (isalpha(src[pos]) || src[pos]=='_')) {
-                while (pos < src.size() && (isalnum(src[pos]) || src[pos]=='_')) {
-                    acc += src[pos];
-                    pos++;
-                    col++;
-                }
-                cerr << "LexerError: Invalid identifier '" << acc << "' at Line " << line << ", Col " << startCol << endl;
-                tokens.push_back({T_INVALID_IDENTIFIER, acc, line, startCol});
-            } else {
-                tokens.push_back(dotSeen ? Token{T_FLOATLIT, acc, line, startCol} : Token{T_INTLIT, acc, line, startCol});
-            }
+            tokens.push_back(dotSeen ? Token{T_FLOATLIT, acc, line, startCol} 
+                                    : Token{T_INTLIT, acc, line, startCol});
             continue;
         }
 
@@ -292,4 +296,5 @@ int main() {
     }
 
     return 0;
+
 }
