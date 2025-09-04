@@ -94,15 +94,22 @@ vector<Token> tokenize(const string& src) {
                     acc += '.';
                 } 
                 else break;
-
                 pos++;
                 col++;
             }
-            tokens.push_back(dotSeen ? Token{T_FLOATLIT, acc, line, startCol} 
-                                    : Token{T_INTLIT, acc, line, startCol});
+            // Check invalid identifier like 123abc
+            if (pos < src.size() && (isalpha(src[pos]) || src[pos]=='_')) {
+                while (pos < src.size() && (isalnum(src[pos]) || src[pos]=='_')) {
+                    acc += src[pos];
+                    pos++;
+                    col++;
+                }
+                tokens.push_back({T_INVALID_IDENTIFIER, acc, line, startCol});
+            } else {
+                tokens.push_back(dotSeen ? Token{T_FLOATLIT, acc, line, startCol} : Token{T_INTLIT, acc, line, startCol});
+            }
             continue;
         }
-
         if (c == '"') {
             int startCol = col;
             int startLine = line;
@@ -298,3 +305,4 @@ int main() {
     return 0;
 
 }
+
